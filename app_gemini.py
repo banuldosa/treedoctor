@@ -7,7 +7,7 @@ from google.genai import types
 from PIL import Image
 from streamlit_geolocation import streamlit_geolocation
 
-# 1. 페이지 설정
+# 1. 페이지 설정 및 초기화
 st.set_page_config(page_title="스마트 나무의사", layout="centered")
 st.title("🌲 스마트 나무의사 - 현장 통합 시스템")
 
@@ -24,13 +24,12 @@ if 'detected_species' not in st.session_state: st.session_state.detected_species
 if 'detected_disease' not in st.session_state: st.session_state.detected_disease = ""
 if 'addr_data' not in st.session_state: st.session_state.addr_data = ""
 
-# 2. [섹션 1] 사진 개수 제한 없는 전문가 정밀 동정
+# 2. [섹션 1] 사진 촬영 및 전문가 AI 동정
 st.markdown("### 1. 현장 사진 촬영 및 AI 정밀 동정")
-# accept_multiple_files=True는 유지하되, 제한 조건(len==3)을 제거
-uploaded_files = st.file_uploader("현장 상황이 담긴 모든 사진을 업로드하세요 (개수 제한 없음).", type=["jpg", "png"], accept_multiple_files=True)
+uploaded_files = st.file_uploader("현장 상황이 담긴 모든 사진을 업로드하세요.", type=["jpg", "png"], accept_multiple_files=True)
 
 if st.button("🚀 전문가 정밀 진단 시작"):
-    if uploaded_files: # 제한 조건 제거
+    if uploaded_files:
         with st.spinner(f"총 {len(uploaded_files)}장의 사진을 분석 중입니다..."):
             for attempt in range(3):
                 try:
@@ -38,30 +37,28 @@ if st.button("🚀 전문가 정밀 진단 시작"):
                     model_name = next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
                     
                     parts = []
-                    # 모든 사진을 리스트에 담아 분석 요청
                     for f in uploaded_files:
                         img = Image.open(f).convert("RGB")
-                        img.thumbnail((1024, 1024)) # 너무 큰 이미지는 크기 조절하여 전송 효율 향상
+                        img.thumbnail((1024, 1024))
                         img_byte_arr = io.BytesIO()
                         img.save(img_byte_arr, format='JPEG')
                         parts.append(types.Part.from_bytes(data=img_byte_arr.getvalue(), mime_type='image/jpeg'))
                     
                     prompt = """
-                    당신은 국가공인 나무의사입니다. 업로드된 다수의 현장 사진을 종합적으로 분석하여 수목의 상태를 진단하세요.
+                    당신은 국가공인 나무의사입니다. 사진을 보고 진단하세요.
+                    형식:
                     수종: [국명(학명)]
-                    병명: [진단된 병해충명 혹은 생리적 장애명]
+                    병명: [병해충명/장애명]
                     피해도: [상/중/하]
-                    전문가 소견: [종합적인 피해 원인 분석 및 처방 의견]
+                    전문가 소견: [해설 및 처방]
                     """
                     parts.append(types.Part.from_text(text=prompt))
                     
                     response = client.models.generate_content(model=model_name, contents=parts)
                     st.session_state.ai_result = response.text
                     
-                    # 자동 파싱
                     s_match = re.search(r"수종:\s*\[(.*?)\]", response.text)
                     d_match = re.search(r"병명:\s*\[(.*?)\]", response.text)
-                    
                     if s_match: st.session_state.detected_species = s_match.group(1)
                     if d_match: st.session_state.detected_disease = d_match.group(1)
                     
@@ -76,7 +73,7 @@ if st.button("🚀 전문가 정밀 진단 시작"):
     else:
         st.warning("사진을 하나 이상 업로드해주세요.")
 
-# 결과 출력 및 수정 UI (이전과 동일)
+# 결과 출력 및 수정 UI
 if st.session_state.ai_result:
     with st.expander("🔍 전문 진단 보고서", expanded=True):
         st.write(st.session_state.ai_result)
@@ -84,3 +81,46 @@ if st.session_state.ai_result:
     col1, col2 = st.columns(2)
     with col1: st.text_input("수종 확정", value=st.session_state.detected_species, key="s_fix")
     with col2: st.text_input("병명/해충명 확정", value=st.session_state.detected_disease, key="d_fix")
+
+    if st.button("🔄 수정된 정보로 보고서 재생성"):
+        st.session_state.detected_species = st.session_state.s_fix
+        st.session_state.detected_disease = st.session_state.d_fix
+        
+        with st.spinner("전문가 의견을 재작성 중입니다..."):
+            try:
+                models = list(client.models.list())
+                model_name = next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
+                re_prompt = f"""
+                당신은 국가공인 나무의사입니다. 
+                수종이 '{st.session_state.detected_species}'이고 병명이 '{st.session_state.detected_disease}'로 확인되었습니다.
+                이 정보를 바탕으로 다시 진단 보고서를 작성해주세요.
+                수종: {st.session_state.detected_species}
+                병명: {st.session_state.detected_disease}
+                피해도: [상/중/하]
+                전문가 소견: [종합적인 처방 의견 및 관리 방안]
+                """
+                response = client.models.generate_content(model=model_name, contents=re_prompt)
+                st.session_state.ai_result = response.text
+                st.rerun()
+            except Exception as e:
+                st.error(f"보고서 재생성 실패: {e}")
+
+# 3. [섹션 2] GPS 위치 수집
+st.markdown("---")
+st.markdown("### 2. 조사 위치 (GPS)")
+col_a, col_b = st.columns([3, 1])
+with col_a:
+    addr_input = st.text_input("현장 주소", value=st.session_state.addr_data)
+with col_b:
+    if st.button("📍 GPS 가져오기"):
+        loc = streamlit_geolocation()
+        if loc and isinstance(loc, dict) and loc.get('latitude'):
+            st.session_state.addr_data = f"위도:{loc['latitude']:.4f}, 경도:{loc['longitude']:.4f}"
+            st.rerun()
+
+# 4. [섹션 3] 전문가 소견
+st.markdown("---")
+st.markdown("### 3. 전문가 관찰 소견")
+st.text_area("전문가 종합 메모", height=100)
+
+if st.button("📄 최종 기술의견서 발행", type="primary", use_container_width=True):
