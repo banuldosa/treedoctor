@@ -1,114 +1,79 @@
 import streamlit as st
-from google import genai
 from PIL import Image
-from streamlit_cropper import st_cropper
 
-# 1. UI 및 레이아웃 설정
-st.set_page_config(page_title="Gemini AI Tree Doctor", page_icon="🌲")
-st.title("🌲 AI Tree Doctor (MVP)")
-st.markdown("### 📷 Upload a photo and crop the infected area for precise diagnosis.")
+# 1. 웹앱 전체 헤더 및 테마 설정
+st.set_page_config(page_title="스마트 나무의사 - 현장 입력", page_icon="🌲", layout="centered")
 
-# 🌟 [에러 원천 차단] 복잡한 HTML 서식 틀을 파이썬 실행문과 섞이지 않게 상단에 독립 선언합니다.
-HTML_TEMPLATE = """
-<div style="padding:25px; border:2px solid #2E7D32; border-radius:12px; font-family:'Malgun Gothic', sans-serif; background-color:#FAFAFA; color:#333; line-height:1.6; max-width:600px; margin:0 auto; box-shadow: 0px 4px 10px rgba(0,0,0,0.1);">
-    <div style="text-align:center; margin-bottom:20px;">
-        <h3 style="color:#2E7D32; margin:0; font-size:18px; font-weight:bold;">🩺 스마트 나무의사 - 진단 및 처방 결과</h3>
-        <div style="border-bottom: 2px dashed #2E7D32; margin-top:10px;"></div>
-    </div>
-    
-    <div style="margin-bottom:25px;">
-        <h4 style="margin:0 0 10px 0; color:#1B5E20; font-size:14px; font-weight:bold;">■ AI 진단 결과</h4>
-        <div style="background-color:#E8F5E9; border:1px solid #C8E6C9; border-radius:6px; padding:12px; text-align:center; font-weight:bold; color:#2E7D32; font-size:15px;">
-            [★ 1순위] 잣나무 털녹병 (신뢰도 92%)
-        </div>
-    </div>
-    
-    <div style="margin-bottom:25px;">
-        <h4 style="margin:0 0 10px 0; color:#1B5E20; font-size:14px; font-weight:bold;">■ 산림청 PLS 등록 약제 목록 (2026년 기준)</h4>
-        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:center; background-color:#FFF;">
-            <thead style="background-color:#4CAF50; color:white; font-weight:bold;">
-                <tr>
-                    <th style="padding:6px; border:1px solid #DDD;">성분명(품목)</th>
-                    <th style="padding:6px; border:1px solid #DDD;">상품명</th>
-                    <th style="padding:6px; border:1px solid #DDD;">희석배수</th>
-                    <th style="padding:6px; border:1px solid #DDD;">살포시기</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="padding:6px; border:1px solid #DDD; font-weight:bold;">테부코나졸</td>
-                    <td style="padding:6px; border:1px solid #DDD;">푸르지오</td>
-                    <td style="padding:6px; border:1px solid #DDD;">물 20L당 10ml</td>
-                    <td style="padding:6px; border:1px solid #DDD; color:#D32F2F; font-weight:bold;">발병초기</td>
-                </tr>
-                <tr>
-                    <td style="padding:6px; border:1px solid #DDD; font-weight:bold;">디페노코나졸</td>
-                    <td style="padding:6px; border:1px solid #DDD;">안심케어</td>
-                    <td style="padding:6px; border:1px solid #DDD;">물 20L당 20g</td>
-                    <td style="padding:6px; border:1px solid #DDD; color:#D32F2F; font-weight:bold;">10일간격</td>
-                </tr>
-            </tbody>
-        </table>
-        <p style="margin:6px 0 0 0; font-size:11px; color:#666;">※ 주주의: 본 수종은 유실수가 아니므로 잎 가해 기준 PLS를 준수합니다.</p>
-    </div>
-    
-    <div style="margin-bottom:25px;">
-        <h4 style="margin:0 0 10px 0; color:#1B5E20; font-size:14px; font-weight:bold;">■ 전문가 처방 코멘트 (환경요인 반영)</h4>
-        <ul style="margin:0; padding-left:20px; font-size:12px; color:#444;">
-            <li style="margin-bottom:5px;">광명시 하안동 현장은 배수불량 및 복토 상태가 관찰됩니다.</li>
-            <li style="margin-bottom:5px;"><span style="color:#D32F2F; font-weight:bold;">약제 살포 전 복토 제거(환토) 및 배수로 정비</span>를 강력히 권장합니다.</li>
-            <li style="margin-bottom:5px;">감염 수간의 우드칩 처리를 금지하고 <span style="color:#D32F2F; font-weight:bold;">즉시 격리 소각</span>하십시오.</li>
-        </ul>
-    </div>
-    
-    <div style="border-bottom: 2px dashed #2E7D32; margin-bottom:20px;"></div>
-    
-    <button onclick="window.print()" style="width:100%; padding:12px; background-color:#2E7D32; color:white; border:none; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer; box-shadow: 0px 3px 6px rgba(0,0,0,0.15);">
-        📄 최종 단계: 기술의견서 PDF 발행하기 ➡️
-    </button>
-</div>
-"""
+# 카카오톡/모바일 최적화를 위한 부드러운 초록색 스타일 입히기
+st.markdown("""
+    <style>
+        .main-title { font-size: 20px; font-weight: bold; color: #2E7D32; text-align: center; padding: 10px; border-bottom: 2px solid #2E7D32; margin-bottom: 20px; }
+        .section-header { font-size: 15px; font-weight: bold; color: #1B5E20; margin-top: 15px; margin-bottom: 5px; }
+        .info-box { background-color: #F1F8E9; border-left: 4px solid #7CB342; padding: 10px; border-radius: 4px; font-size: 13px; margin-bottom: 10px; }
+    </style>
+""", unsafe_allow_html=True)
 
-# 2. Secrets 보안 Key 정제
-raw_api_key = st.secrets.get("GEMINI_API_KEY", "")
-GOOGLE_API_KEY = raw_api_key.strip() if raw_api_key else ""
+# [ 🌲 스마트 나무의사 - 현장 입력 ] Title
+st.markdown('<div class="main-title">🩺 스마트 나무의사 - 현장 입력</div>', unsafe_allow_html=True)
 
-if not GOOGLE_API_KEY:
-    st.error("⚠️ API Key가 설정되지 않았습니다. Streamlit Advanced settings를 확인해주세요.")
+# -------------------------------------------------------------------------
+# 1. 수목 피해 사진 등록
+# -------------------------------------------------------------------------
+st.markdown('<div class="section-header">1. 수목 피해 사진 등록 (필수)</div>', unsafe_allow_html=True)
+uploaded_file = st.file_uploader("📸 스마트폰 카메라 촬영 또는 파일 선택", type=["jpg", "jpeg", "png"])
+
+# 시연용 기본 상태 혹은 파일 업로드 완료 상태 표시
+if uploaded_file is not None:
+    st.markdown(f'<div class="info-box">👉 {uploaded_file.name} 등록 완료!</div>', unsafe_allow_html=True)
+    # 업로드한 사진 미리보기 화면 분출
+    img = Image.open(uploaded_file)
+    st.image(img, caption="현장 등록 사진", use_container_width=True)
 else:
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
+    st.markdown('<div class="info-box">👉 사진을 등록해 주세요. (테스트 시: 잣나무털녹병.jpg)</div>', unsafe_allow_html=True)
 
-    if uploaded_file is not None:
-        img = Image.open(uploaded_file)
-        st.markdown("#### ✂️ 사각형 조절 상자로 미세 병징 부위를 지정해 주세요:")
-        
-        cropped_img = st_cropper(
-            img, 
-            realtime_update=False, 
-            box_color='#FF3333', 
-            aspect_ratio=None
-        )
-        
-        st.markdown("ℹ️ *상자 영역을 지정한 후, 아래 버튼을 누르면 해당 확대 이미지로 진단이 시작됩니다.*")
-        
-        if st.button("🚀 선택 구간으로 진단 시작", type="primary"):
-            st.warning("🔄 Analyzing... Please wait a moment.")
-            
-            prompt_text = "Analyze this tree disease crop image carefully."
-            
-            try:
-                client = genai.Client(api_key=GOOGLE_API_KEY)
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=[cropped_img, prompt_text]
-                )
-                
-                st.markdown("---")
-                
-                # 🌟 안전하게 외부에서 선언된 HTML 템플릿 스트링만 쏙 가져와서 화면에 출력합니다.
-                st.components.v1.html(HTML_TEMPLATE, height=560)
-                
-                st.info("💡 **의뢰인 전송용 파일 추출**: 위 버튼을 누르고 대상을 [PDF로 저장] 하시면 스마트폰에 문서가 깔끔하게 파일로 저장됩니다.")
-                
-            except Exception as e:
-                st.error(f"⚠️ Connection Error: {str(e)}")
+
+# -------------------------------------------------------------------------
+# 2. AI 수종 동정 결과
+# -------------------------------------------------------------------------
+st.markdown('<div class="section-header">2. AI 수종 동정 결과 (자동 입력됨)</div>', unsafe_allow_html=True)
+# 대표 수종 목록을 드롭다운박스로 제공하여, 틀렸을 때 사용자가 직접 누르고 바꿀 수 있게 유도
+tree_options = ["잣나무 (Pinus koraiensis)", "소나무 (Pinus densiflora)", "해송 (Pinus thunbergii)", "스트로브잣나무 (Pinus strobus)", "직접 입력"]
+selected_tree = st.selectbox("🎯 95% 일치 (*틀렸다면 눌러서 직접 변경 가능)", tree_options, index=0)
+
+
+# -------------------------------------------------------------------------
+# 3. 조사 위치
+# -------------------------------------------------------------------------
+st.markdown('<div class="section-header">3. 조사 위치 (GPS 자동 특정)</div>', unsafe_allow_html=True)
+location_input = st.text_input("📍 현장 주소", value="경기도 광명시 하안동 OOO아파트 단지 내")
+col1, col2 = st.columns([3, 1])
+with col2:
+    st.button("🗺️ 위치 재검색", use_container_width=True)
+
+
+# -------------------------------------------------------------------------
+# 4. 전문가 추가 관찰 소견
+# -------------------------------------------------------------------------
+st.markdown('<div class="section-header">4. 전문가 추가 관찰 소견 (선택)</div>', unsafe_allow_html=True)
+
+st.markdown("**▪ 토양 상태 (중복 체크 가능)**")
+# 사용자가 한눈에 체크할 수 있도록 가로 배치 레이아웃 구성
+chk_col1, chk_col2, chk_col3 = st.columns(3)
+with chk_col1:
+    soil_1 = st.checkbox("복토/심식", value=True)  # 기본 체크 상태 활성화
+with chk_col2:
+    soil_2 = st.checkbox("답압", value=False)
+with chk_col3:
+    soil_3 = st.checkbox("배수불량", value=True)  # 기본 체크 상태 활성화
+
+st.markdown("**▪ 현장 메모**")
+default_memo = "수간 하부에서 약간의 송진 유출 흔적이 관찰되며, 인근 잣나무로의 전염 확산이 우려되는 상황임."
+user_memo = st.text_area("현장 특이사항 직접 입력", value=default_memo, height=100)
+
+
+# -------------------------------------------------------------------------
+# 하단 진행 버튼
+# -------------------------------------------------------------------------
+st.markdown("---")
+if st.button("🚀 다음: AI 진단 및 PLS 처방 보기 ➡️", type="primary", use_container_width=True):
+    st.success("✅ 1단계 현장 데이터 수집 완료! 2단계 진단서 매핑 단계로 이동합니다.")
