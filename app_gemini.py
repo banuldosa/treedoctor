@@ -37,7 +37,7 @@ if uploaded_files and len(uploaded_files) == 3:
                 
                 # 안정적인 모델 호출 (gemini-1.5-flash)
                 response = client.models.generate_content(
-                    model='gemini-1.5-flash',
+                    model='models/gemini-1.5-flash',
                     contents=types.Content(role="user", parts=parts)
                 )
                 
