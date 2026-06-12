@@ -1,41 +1,46 @@
 import streamlit as st
 from google import genai
-from google.genai import types
 from PIL import Image
 import io
-import sys
 
-# 1. 시스템 입출력 UTF-8 강제 변환
-try:
-    sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding='utf-8')
-except Exception:
-    pass
-
-# 2. 웹앱 메인 타이틀 및 레이아웃 설정 (오류 방지를 위해 메인 안내는 영어/이모지 조합 후 마크다운 처리)
+# 1. 웹앱 기본 레이아웃 설정
 st.set_page_config(page_title="Gemini AI Tree Doctor", page_icon="🌲")
 st.title("🌲 AI Tree Doctor (MVP)")
 st.markdown("### 📷 Take a photo or upload an image to diagnose tree diseases.")
 
-# 3. Streamlit Cloud Secrets로부터 API Key 로드
+# 2. Streamlit Cloud Secrets로부터 API Key 안전하게 로드
 GOOGLE_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 
 if not GOOGLE_API_KEY:
     st.warning("👈 Please set GEMINI_API_KEY in Streamlit advanced settings.")
 else:
+    # 구글 GenAI 클라이언트 가동
     client = genai.Client(api_key=GOOGLE_API_KEY)
     
-    # 🌟 파일 업로더 가동 (에러 방지를 위해 라벨을 영문으로 심플하게 처리)
+    # 통합 이미지 업로더 가동
     uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
+        # 이미지 열기 및 출력
         image = Image.open(uploaded_file)
         st.image(image, caption="Target Image", use_container_width=True)
         
-        # 🌟 시스템 UI 에러 유발 구역을 안전한 텍스트로 대체
         st.warning("🔄 Analyzing... Please wait a moment.")
 
-        # 🌟 구글 서버로 직접 들어가는 지시문 패키지 (이 데이터는 API 통신용이라 안전합니다)
+        # 이미지 데이터를 구글 API 규격에 맞는 바이너리 패키지로 정밀 가공
+        img_byte_arr = io.BytesIO()
+        # 원본 포맷 유지 (없으면 JPEG로 기본 지정)
+        img_format = image.format if image.format else "JPEG"
+        image.save(img_byte_arr, format=img_format)
+        img_bytes = img_byte_arr.getvalue()
+
+        # 인코딩 오류를 유발하는 객체 지향 방식을 버리고, 가장 안정적인 구조 체계로 이미지 포장
+        image_part = {
+            "mime_type": f"image/{img_format.lower()}",
+            "data": img_bytes
+        }
+
+        # 구글 AI 스튜디오 서버 전달용 전문 진단 프롬프트
         prompt_text = (
             "당신은 전문 나무의사입니다. 제공된 사진의 수목 병해충을 정밀 진단해 주세요. "
             "반드시 한국어로 답변해야 하며, 다음 4가지 항목을 마크다운 서식으로 출력하세요:\n\n"
@@ -46,16 +51,10 @@ else:
         )
         
         try:
-            # 안전한 Content 객체 래핑 방식으로 송신
+            # gemini-2.5-flash 모델에 이미지 바이너리 패키지와 텍스트 전송
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
-                contents=[
-                    image,
-                    types.Content(
-                        role="user",
-                        parts=[types.Part.from_text(text=prompt_text)]
-                    )
-                ]
+                contents=[image_part, prompt_text]
             )
             
             # 최종 리포트 출력 구역
@@ -67,5 +66,5 @@ else:
                 st.error("No text response generated.")
             
         except Exception as e:
-            # 에러 메시지 자체 출력 시 깨짐 현상 완벽 방어
-            st.error("⚠️ Connection Error. Please try again.")
+            # 통신 에러 내용 상세 출력 (추후 디버깅 용도)
+            st.error(f"⚠️ Connection Error: {str(e)}")
