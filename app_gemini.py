@@ -30,7 +30,7 @@ if uploaded_files and len(uploaded_files) == 3:
                 parts.append(types.Part.from_text(text="이 사진들의 수종과 병명을 '수종:OOO, 병명:OOO' 형식으로 답해줘."))
                 
                 response = client.models.generate_content(
-                    model='gemini-1.5-flash',
+                    model='gemini-2.0-flash',
                     contents=types.Content(role="user", parts=parts)
                 )
                 st.session_state.ai_result = response.text
