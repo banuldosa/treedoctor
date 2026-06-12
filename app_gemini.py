@@ -5,15 +5,13 @@ import os
 # 1. 페이지 설정
 st.set_page_config(page_title="Gemini AI 나무의사", page_icon="🌲")
 st.title("🌲 구글 AI 스튜디오 기반 나무의사 (MVP)")
-st.write("스마트폰으로 아픈 나무 사진을 찍어 올리면, Gemini가 즉시 진단 및 처방을 내립니다.")
+st.write("스마트폰으로 아픈 나무 사진을 찍어 올리거나 저장된 사진을 선택하면, Gemini가 즉시 진단 및 처방을 내립니다.")
 
-# 2. API Key 자동 가져오기 설정 (Streamlit Cloud Secrets 및 로컬 환경 대응)
+# 2. API Key 자동 가져오기 설정
 GOOGLE_API_KEY = ""
 
-# 우선 Streamlit Secrets에 저장된 키가 있는지 확인
 if "GEMINI_API_KEY" in st.secrets:
     GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
-# 만약 없다면 사이드바에서 수동으로 입력받기
 else:
     GOOGLE_API_KEY = st.sidebar.text_input("Google API Key 입력", type="password")
 
@@ -21,16 +19,16 @@ else:
 if not GOOGLE_API_KEY:
     st.warning("👈 왼쪽 사이드바에 구글 AI 스튜디오에서 발급받은 API Key를 입력해 주세요.")
 else:
-    # 획득한 키로 구글 클라이언트 연결
     client = genai.Client(api_key=GOOGLE_API_KEY)
     
-    # 스마트폰 전용 카메라 입력창
-    uploaded_file = st.file_uploader("📷 아픈 나무 사진 촬영 또는 선택하기", type=["jpg", "jpeg", "png"])uploaded_file = st.file_uploader("📷 아픈 나무 사진 촬영 또는 선택하기", type=["jpg", "jpeg", "png"])
+    # 🌟 카메라 연동 오류를 100% 우회하는 파일 업로더 형식
+    # 버튼을 누르면 스마트폰 자체 기능으로 [카메라 촬영] 또는 [사진 앨범에서 선택]이 모두 가능해집니다.
+    uploaded_file = st.file_uploader("📷 아픈 나무 사진을 촬영하거나 앨범에서 선택해 주세요", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
         from PIL import Image
         image = Image.open(uploaded_file)
-        st.image(image, caption="현장 촬영 이미지", use_container_width=True)
+        st.image(image, caption="분석 대상 이미지", use_container_width=True)
         st.info("🔄 구글 인공지능이 이미지를 분석하고 처방전을 작성 중입니다...")
 
         # 진단 프롬프트
@@ -41,7 +39,6 @@ else:
         )
         
         try:
-            # 404 에러 없는 최신 범용 모델 사용
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=[image, prompt_text]
