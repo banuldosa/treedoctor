@@ -9,21 +9,24 @@ from streamlit_geolocation import streamlit_geolocation
 st.set_page_config(page_title="스마트 나무의사", layout="centered")
 st.title("🌲 스마트 나무의사 - 현장 통합 시스템")
 
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+# API Client 초기화
+try:
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception as e:
+    st.error("API 키를 확인하세요.")
+    st.stop()
 
 # 세션 데이터 초기화
 if 'ai_result' not in st.session_state: st.session_state.ai_result = ""
-if 'address_input' not in st.session_state: st.session_state.address_input = "위치 정보를 가져오세요."
+if 'address_input' not in st.session_state: st.session_state.address_input = ""
 
-# ---------------------------------------------------------
-# [화면 1] 사진 촬영 및 AI 동정 (상단)
-# ---------------------------------------------------------
+# 2. [화면 1] 사진 촬영 및 AI 동정
 st.markdown("### 1. 현장 사진 촬영 및 업로드")
 uploaded_files = st.file_uploader("전체/근접/병반 3장을 업로드하세요.", type=["jpg", "png"], accept_multiple_files=True)
 
 col_a, col_b = st.columns([3, 1])
 with col_a:
-    ai_result_input = st.text_input("AI 동정 결과", value=st.session_state.ai_result)
+    ai_result_input = st.text_input("AI 동정 결과", value=st.session_state.ai_result, help="사진 분석 후 결과가 자동으로 입력됩니다.")
 with col_b:
     st.write("###")
     if st.button("🚀 AI 분석 시작", use_container_width=True):
@@ -31,7 +34,8 @@ with col_b:
             with st.spinner("이미지 분석 중..."):
                 try:
                     models = list(client.models.list())
-                    model_to_use = next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
+                    model_name = next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
+                    
                     parts = []
                     for f in uploaded_files:
                         img = Image.open(f)
@@ -40,21 +44,20 @@ with col_b:
                         img_byte_arr = io.BytesIO()
                         img.save(img_byte_arr, format='JPEG')
                         parts.append(types.Part.from_bytes(data=img_byte_arr.getvalue(), mime_type='image/jpeg'))
+                    
                     parts.append(types.Part.from_text(text="이 사진들의 수종과 병명을 '수종:OOO, 병명:OOO' 형식으로 답해줘."))
                     
-                    response = client.models.generate_content(model=model_to_use, contents=types.Content(role="user", parts=parts))
+                    response = client.models.generate_content(model=model_name, contents=types.Content(role="user", parts=parts))
                     st.session_state.ai_result = response.text
                     st.rerun()
                 except Exception as e:
                     st.error(f"분석 오류: {e}")
         else:
-            st.warning("사진 3장을 업로드해주세요.")
+            st.warning("사진 3장을 모두 업로드해주세요.")
 
-st.selectbox("💡 오동정 시 수종 직접 선택", ["선택하세요", "잣나무", "소나무", "느티나무", "은행나무", "기타"])
+st.selectbox("💡 오동정 시 수종 직접 선택", ["선택하세요", "잣나무", "소나무", "느티나무", "은행나무", "기타 수종"])
 
-# ---------------------------------------------------------
-# [화면 2] GPS 기반 위치 자동 특정 (중단)
-# ---------------------------------------------------------
+# 3. [화면 2] GPS 기반 위치 자동 특정
 st.markdown("---")
 st.markdown("### 2. 조사 위치 (GPS 자동 특정)")
 col_c, col_d = st.columns([3, 1])
@@ -64,13 +67,13 @@ with col_d:
     st.write("###")
     if st.button("📍 현재 위치(GPS) 가져오기", use_container_width=True):
         loc = streamlit_geolocation()
-        if loc and 'latitude' in loc:
+        if loc and isinstance(loc, dict) and 'latitude' in loc:
             st.session_state.address_input = f"위도:{loc['latitude']:.4f}, 경도:{loc['longitude']:.4f}"
             st.rerun()
+        else:
+            st.warning("위치 정보를 가져올 수 없습니다.")
 
-# ---------------------------------------------------------
-# [화면 3] 전문가 관찰 소견 (하단)
-# ---------------------------------------------------------
+# 4. [화면 3] 전문가 관찰 소견
 st.markdown("---")
 st.markdown("### 3. 전문가 관찰 소견")
 c1, c2 = st.columns(2)
