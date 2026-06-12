@@ -2,8 +2,6 @@ import streamlit as st
 from google import genai
 from PIL import Image
 from streamlit_cropper import st_cropper
-from fpdf import FPDF
-import io
 
 # 1. UI 및 레이아웃 설정
 st.set_page_config(page_title="Gemini AI Tree Doctor", page_icon="🌲")
@@ -69,41 +67,27 @@ else:
                     diagnosis_result = response.text
                     st.markdown(diagnosis_result)
                     
-                    # 🌟 [안전화 적용] 다운로드 스트레스가 없는 내장 표준 폰트 엔진 가동
-                    pdf = FPDF()
-                    pdf.add_page()
-                    
-                    # 외부 주소 대신 내장 폰트(Courier)를 지정하여 TTF 파일 누락 에러를 완벽하게 차단합니다.
-                    pdf.set_font("Courier", size=11)
-                    
-                    # PDF 타이틀 작성
-                    pdf.cell(200, 10, txt="[AI Tree Doctor Report]", ln=True, align='C')
-                    pdf.ln(10)
-                    
-                    # 텍스트 라인 바인딩
-                    for line in diagnosis_result.split('\n'):
-                        clean_line = line.replace('**', '').replace('#', '').strip()
-                        if clean_line:
-                            # 영문 보고서 서식 안정성을 위해 latin-1 인코딩 유연화 처리
-                            pdf.multi_cell(0, 8, txt=clean_line.encode('utf-8', 'ignore').decode('latin-1'))
-                    
-                    # 바이트 데이터 변환
-                    pdf_output = io.BytesIO()
-                    pdf.output(pdf_output)
-                    pdf_bytes = pdf_output.getvalue()
-                    
                     st.markdown("---")
                     st.markdown("### 📄 의뢰인 전송용 결과물 출력")
                     
-                    # 스마트폰 공용 PDF 다운로드 버튼
-                    st.download_button(
-                        label="📥 수목 처방전 PDF 다운로드",
-                        data=pdf_bytes,
-                        file_name="AI_Tree_Doctor_Report.pdf",
-                        mime="application/pdf"
-                    )
+                    # 🌟 [혁신적 해결책] 외부 PDF 라이브러리를 쓰지 않고, 
+                    # 브라우저 친화적인 HTML 서식으로 진단서를 빌드하여 출력 버그를 원천 차단합니다.
+                    html_content = diagnosis_result.replace('\n', '<br>')
                     
-                    st.info("💡 **카카오톡 공유 팁**: 위 PDF 다운로드 버튼을 눌러 스마트폰에 저장하신 후, 카카오톡 창에서 [파일 보내기]를 선택하시면 의뢰인이나 동료에게 처방전을 즉시 공유할 수 있습니다.")
+                    # 모바일 및 PC에서 즉시 인쇄/PDF 저장이 가능한 컴포넌트 이식
+                    st.components.v1.html(f"""
+                        <div id="print-area" style="padding:20px; border:1px solid #ddd; border-radius:8px; font-family:sans-serif; background-color:#fff; color:#333; line-height:1.6;">
+                            <h2 style="text-align:center; color:#2E7D32;">[AI 수목 진단 및 처방서]</h2>
+                            <hr style="border:1px solid #2E7D32;">
+                            <p style="font-size:14px;">{html_content}</p>
+                        </div>
+                        <br>
+                        <button onclick="window.print()" style="width:100%; padding:12px; background-color:#2E7D32; color:white; border:none; border-radius:5px; font-size:16px; font-weight:bold; cursor:pointer;">
+                            🖨️ 진단서 인쇄 및 PDF 저장하기
+                        </button>
+                    """, height=400, scrolling=True)
+                    
+                    st.info("💡 **인쇄 및 PDF 저장 방법**: 위의 초록색 버튼을 누르면 인쇄 창이 뜹니다. 대상 지정을 **'PDF로 저장'**으로 선택하시면 깨끗한 한글 PDF 파일이 생성되며, 이를 카카오톡으로 의뢰인에게 바로 전송할 수 있습니다!")
                     
                 else:
                     st.error("No text response generated.")
