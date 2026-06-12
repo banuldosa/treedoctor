@@ -1,53 +1,49 @@
 import streamlit as st
-from google import genai
 from PIL import Image
 from streamlit_cropper import st_cropper
 
-st.set_page_config(page_title="스마트 나무의사", page_icon="🌲")
+# 세션 상태 유지
+if 'step' not in st.session_state: st.session_state.step = 0
+if 'form' not in st.session_state: 
+    st.session_state.form = {
+        'tree': "잣나무 (Pinus koraiensis)",
+        'loc': "경기도 광명시 하안동 OOO아파트 단지 내",
+        'memo': "수간 하부에서 약간의 송진 유출 흔적이 관찰되며,\n인근 잣나무로의 전염 확산이 우려되는 상황임."
+    }
 
-# 1. 초기 데이터 상태 설정
-if 'data' not in st.session_state:
-    st.session_state.data = {'tree': "잣나무", 'disease': "털녹병", 'loc': "경기도 광명시 하안동 OOO아파트", 'memo': "수간 하부 송진 유출 흔적 관찰"}
+st.title("🌲 스마트 나무의사 - 현장 입력")
 
-st.title("🌲 스마트 나무의사 (현장 실무형)")
-
-# --- [0단계: 사진 진단] ---
-st.markdown("### 0. 현장 사진 촬영 및 진단")
-uploaded_file = st.file_uploader("사진을 올려주세요", type=["jpg", "png"])
+# 1. 수목 피해 사진 등록
+st.markdown("### 1. 수목 피해 사진 등록 (필수)")
+uploaded_file = st.file_uploader("📸 스마트폰 카메라 촬영 / 파일 선택", type=["jpg", "png"])
 if uploaded_file:
-    img = Image.open(uploaded_file)
-    cropped_img = st_cropper(img, realtime_update=False, box_color='#FF3333')
-    st.success("✅ AI 동정 완료: 잣나무 / 털녹병 (신뢰도 92%)")
+    st.image(uploaded_file, caption="등록된 피해 사진", use_container_width=True)
+    st.success(f"👉 {uploaded_file.name} 등록 완료!")
 
-st.markdown("---")
+# 2. AI 수종 동정 결과
+st.markdown("### 2. AI 수종 동정 결과")
+st.session_state.form['tree'] = st.selectbox(
+    "🎯 95% 일치 (틀렸다면 직접 변경)", 
+    ["잣나무 (Pinus koraiensis)", "소나무 (Pinus densiflora)", "해송 (Pinus thunbergii)"],
+    index=0
+)
 
-# --- [1단계: 현장 입력] ---
-st.markdown("### 1. 현장 입력 및 소견")
-col1, col2 = st.columns(2)
+# 3. 조사 위치 (GPS 자동 특정)
+st.markdown("### 3. 조사 위치 (GPS 자동 특정)")
+col1, col2 = st.columns([4, 1])
 with col1:
-    st.session_state.data['tree'] = st.text_input("수종", st.session_state.data['tree'])
+    st.session_state.form['loc'] = st.text_input("위치 정보", st.session_state.form['loc'])
 with col2:
-    st.session_state.data['loc'] = st.text_input("조사 위치", st.session_state.data['loc'])
+    st.button("🗺️ 재검색")
 
-soil = st.multiselect("토양 상태(중복)", ["복토/심식", "답압", "배수불량"], default=["복토/심식", "배수불량"])
-st.session_state.data['memo'] = st.text_area("전문가 메모", st.session_state.data['memo'])
+# 4. 전문가 추가 관찰 소견
+st.markdown("### 4. 전문가 추가 관찰 소견 (선택)")
+soil_status = st.multiselect("토양 상태(중복 체크)", ["복토/심식", "답압", "배수불량"], default=["복토/심식", "배수불량"])
+st.session_state.form['memo'] = st.text_area("현장 메모", st.session_state.form['memo'], height=100)
 
 st.markdown("---")
 
-# --- [2단계: 최종 결과 및 PDF 발행] ---
-st.markdown("### 2. 최종 처방 결과")
-if st.button("🚀 처방전 생성하기"):
-    st.components.v1.html(f"""
-    <div style="padding:20px; border:2px solid #2E7D32; border-radius:10px; font-family:sans-serif; background:#FAFAFA;">
-        <h4 style="color:#1B5E20;">■ AI 진단 결과: {st.session_state.data['disease']}</h4>
-        <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:center;">
-            <tr style="background:#4CAF50; color:white;"><th>성분명</th><th>상품명</th><th>희석배수</th></tr>
-            <tr><td style="border:1px solid #ddd;">테부코나졸</td><td style="border:1px solid #ddd;">푸르지오</td><td style="border:1px solid #ddd;">20L/10ml</td></tr>
-        </table>
-        <h4 style="color:#1B5E20; margin-top:20px;">■ 전문가 처방 코멘트</h4>
-        <p style="font-size:13px;">{st.session_state.data['memo']}</p>
-        <button onclick="window.print()" style="width:100%; padding:12px; background:#2E7D32; color:white; border:none; border-radius:5px; font-weight:bold;">
-            📄 최종 단계: 기술의견서 PDF 발행하기 ➡️
-        </button>
-    </div>
-    """, height=400)
+# 2단계(처방 보기)로 넘어가는 버튼
+if st.button("🚀 다음: AI 진단 및 PLS 처방 보기 ➡️", type="primary", use_container_width=True):
+    st.session_state.step = 2
+    st.rerun()
