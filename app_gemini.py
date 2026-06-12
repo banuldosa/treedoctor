@@ -124,3 +124,4 @@ st.markdown("### 3. 전문가 관찰 소견")
 st.text_area("전문가 종합 메모", height=100)
 
 if st.button("📄 최종 기술의견서 발행", type="primary", use_container_width=True):
+    st.success("데이터 취합 완료! PDF 생성 모듈 연동 준비 완료.")
