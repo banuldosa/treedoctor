@@ -9,8 +9,6 @@ st.markdown("### 📷 Take a photo or upload an image to diagnose tree diseases.
 
 # 2. Secrets로부터 API Key 로드 및 정제
 raw_api_key = st.secrets.get("GEMINI_API_KEY", "")
-
-# 혹시 모를 앞뒤 공백이나 유령 문자 제거
 GOOGLE_API_KEY = raw_api_key.strip() if raw_api_key else ""
 
 if not GOOGLE_API_KEY:
@@ -25,24 +23,27 @@ else:
         
         st.warning("🔄 Analyzing... Please wait a moment.")
 
-        # ASCII 에러를 원천 차단하기 위해 영문 프로그래밍 프롬프트로 송신
+        # 🌟 [입력 위치] 여기에 정교한 영문 지시문(Prompt)이 들어갑니다.
+        # AI에게 한국산림청 및 수목보호학적 기준을 따르되, 답변은 한국어로 하도록 강제하는 설정입니다.
         prompt_text = (
-            "You are an expert Tree Doctor. Diagnose the tree disease or pest in the provided photo. "
+            "You are a strict and highly accurate Tree Doctor certified by the Korea Forest Service. "
+            "Analyze the provided high-resolution image of the tree disease or pest very carefully. "
+            "Look for microscopic signs such as mycelium, spores, lesions, frass, or specific discoloration pattern. "
             "CRITICAL: You must write the entire response in Korean. "
             "Format the output strictly in Markdown with the following 4 sections:\n\n"
-            "1. [진단명]: Name of the tree disease or pest\n"
-            "2. [판단 이유]: Reasons for diagnosis and symptoms observed\n"
-            "3. [추천 방제법]: Effective chemical/pesticide treatments and methods\n"
-            "4. [주의사항]: Precautions during chemical spraying and future tree management tips"
+            "1. [정확한 진단명]: Provide the exact common Korean name and scientific name of the disease/pest.\n"
+            "2. [수목보호학적 진단 근거]: Explain why you diagnosed this based on the visual symptoms (e.g., color of spores, shape of canker) in the photo.\n"
+            "3. [산림청 기준 방제법]: Suggest exact chemical treatments (pesticide names approved in Korea) and cultural/mechanical control methods.\n"
+            "4. [수목 관리 주의사항]: Note precautions regarding pesticide resistance, timing of application, and environment factors."
         )
         
         try:
-            # 안전하게 세탁된 API Key로 전송 직전에 클라이언트 생성
-            # 만약 키 자체에 깨진 문자가 있다면 이 단계에서 캐치해냅니다.
+            # 안전하게 세탁된 API Key로 클라이언트 생성
             client = genai.Client(api_key=GOOGLE_API_KEY)
             
+            # 🌟 [모델 변경] 기존 'gemini-2.5-flash'에서 고성능 추론 모델인 'gemini-2.5-pro'로 교체했습니다.
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-2.5-pro',
                 contents=[image, prompt_text]
             )
             
@@ -54,8 +55,7 @@ else:
                 st.error("No text response generated.")
             
         except Exception as e:
-            # 에러 발생 시 키 인코딩 문제인지 식별할 수 있도록 가이드 제공
             error_msg = str(e)
             st.error(f"⚠️ Connection Error: {error_msg}")
             if "ascii" in error_msg.lower():
-                st.info("💡 Tip: 구글 AI 스튜디오에서 API 키를 새로 발급받아 Secrets에 다시 붙여넣어 보세요. 키 내부에 깨진 문자가 섞여있을 가능성이 매우 높습니다.")
+                st.info("💡 Tip: 구글 AI 스튜디오에서 API 키를 새로 발급받아 Secrets에 다시 붙여넣어 보세요.")
