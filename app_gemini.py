@@ -2,8 +2,10 @@ import streamlit as st
 from google import genai
 from PIL import Image
 from streamlit_cropper import st_cropper
+from fpdf import FPDF
+import io
 
-# 1. UI 및 웹앱 레이아웃 설정
+# 1. UI 및 레이아웃 설정
 st.set_page_config(page_title="Gemini AI Tree Doctor", page_icon="🌲")
 st.title("🌲 AI Tree Doctor (MVP)")
 st.markdown("### 📷 Upload a photo and crop the infected area for precise diagnosis.")
@@ -19,13 +21,10 @@ else:
     uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
-        # 원본 이미지 로드
         img = Image.open(uploaded_file)
         
         st.markdown("#### ✂️ 사각형 조절 상자로 미세 병징 부위를 지정해 주세요:")
         
-        # 🌟 [트래픽 완벽 방어] realtime_update=False 설정을 통해 
-        # 사용자가 상자를 드래그하는 동안 불필요한 새로고침이나 트래픽이 생기는 것을 원천 차단합니다.
         cropped_img = st_cropper(
             img, 
             realtime_update=False, 
@@ -35,11 +34,9 @@ else:
         
         st.markdown("ℹ️ *상자 영역을 지정한 후, 아래 버튼을 누르면 해당 확대 이미지로 진단이 시작됩니다.*")
         
-        # 🌟 최종 버튼을 누르는 순간에만 구글 서버로 요청이 날아갑니다 (하루 20회 제한 방어)
         if st.button("🚀 선택 구간으로 진단 시작", type="primary"):
             st.warning("🔄 Analyzing... Please wait a moment.")
 
-            # 첫 문장 고정 및 수목보호학적 진단을 유도하는 정교한 프롬프트
             prompt_text = (
                 "You are a strict and highly accurate Tree Doctor AI certified by the Korea Forest Service. "
                 "Analyze the provided close-up/cropped image of the tree disease or pest very carefully. "
@@ -58,10 +55,8 @@ else:
             )
             
             try:
-                # 안전한 키로 구글 GenAI 클라이언트 오픈
                 client = genai.Client(api_key=GOOGLE_API_KEY)
                 
-                # 사용자가 최종 지정한 크롭 이미지만 깔끔하게 송신
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=[cropped_img, prompt_text]
@@ -69,8 +64,49 @@ else:
                 
                 st.markdown("---")
                 st.markdown("### 📋 AI Tree Doctor Diagnosis")
+                
                 if response.text:
-                    st.markdown(response.text)
+                    diagnosis_result = response.text
+                    st.markdown(diagnosis_result)
+                    
+                    # 🌟 [다음 단계 가동] PDF 진단서 생성 엔진
+                    pdf = FPDF()
+                    pdf.add_page()
+                    
+                    # 깨짐 방지용 기본 폰트(나눔고딕 웹 폰트 자동 연동)
+                    pdf.add_font("NanumGothic", "", "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf")
+                    pdf.set_font("NanumGothic", size=12)
+                    
+                    # PDF 문서 타이틀 구성
+                    pdf.cell(200, 10, txt="[AI 수목 진단 및 처방서]", ln=True, align='C')
+                    pdf.ln(10)
+                    
+                    # AI가 출력한 텍스트 한 줄씩 PDF에 바인딩
+                    for line in diagnosis_result.split('\n'):
+                        # 특수 마크다운 기호 제거 후 순수 텍스트만 이식
+                        clean_line = line.replace('**', '').replace('#', '').strip()
+                        if clean_line:
+                            pdf.multi_cell(0, 8, txt=clean_line)
+                    
+                    # 바이트 스트림 변환
+                    pdf_output = io.BytesIO()
+                    pdf.output(pdf_output)
+                    pdf_bytes = pdf_output.getvalue()
+                    
+                    st.markdown("---")
+                    st.markdown("### 📄 의뢰인 전송용 결과물 출력")
+                    
+                    # 📥 스마트폰 및 PC 공용 PDF 다운로드 버튼 가동
+                    st.download_button(
+                        label="📥 수목 처방전 PDF 다운로드",
+                        data=pdf_bytes,
+                        file_name="AI_Tree_Doctor_Report.pdf",
+                        mime="application/pdf"
+                    )
+                    
+                    # 💬 카카오톡 공유 유도 가이드라인 안내
+                    st.info("💡 **카카오톡 공유 팁**: 위 PDF 다운로드 버튼을 눌러 스마트폰에 저장하신 후, 카카오톡 창에서 [파일 보내기]를 선택하시면 의뢰인이나 동료에게 처방전을 즉시 공유할 수 있습니다.")
+                    
                 else:
                     st.error("No text response generated.")
                 
