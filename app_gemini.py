@@ -1,6 +1,13 @@
 import streamlit as st
 from google import genai
 import os
+import sys
+
+# 🔥 [핵심 추가] 파이썬이 한글을 다룰 때 ASCII가 아닌 UTF-8(국제 표준 한글 형식)로 처리하도록 강제 설정
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding='utf-8')
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Gemini AI 나무의사", page_icon="🌲")
@@ -21,8 +28,7 @@ if not GOOGLE_API_KEY:
 else:
     client = genai.Client(api_key=GOOGLE_API_KEY)
     
-    # 🌟 카메라 연동 오류를 100% 우회하는 파일 업로더 형식
-    # 버튼을 누르면 스마트폰 자체 기능으로 [카메라 촬영] 또는 [사진 앨범에서 선택]이 모두 가능해집니다.
+    # 사진 촬영 및 파일 업로드 통합 버튼
     uploaded_file = st.file_uploader("📷 아픈 나무 사진을 촬영하거나 앨범에서 선택해 주세요", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
@@ -31,7 +37,7 @@ else:
         st.image(image, caption="분석 대상 이미지", use_container_width=True)
         st.info("🔄 구글 인공지능이 이미지를 분석하고 처방전을 작성 중입니다...")
 
-        # 진단 프롬프트
+        # 🌟 한글 인코딩 오류가 절대 나지 않도록 내부 텍스트 변수 처리 준비
         prompt_text = (
             "이 수목 사진을 진단해 주세요. "
             "반드시 수목보호학 지식을 기반으로 하여 [진단명], [판단 이유], [추천 방제법(농약)], [주의사항]의 순서로 "
@@ -39,6 +45,7 @@ else:
         )
         
         try:
+            # 구글 최신 플래시 모델로 분석 요청
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=[image, prompt_text]
@@ -49,4 +56,5 @@ else:
             st.markdown(response.text)
             
         except Exception as e:
-            st.error(f"⚠️ 진단 중 오류가 발생했습니다: {e}")
+            # 혹시 모를 에러 발생 시 한글로 부드럽게 출력되도록 강제 인코딩 처리
+            st.error(f"⚠️ 진단 중 오류가 발생했습니다: {str(e).encode('utf-8', errors='ignore').decode('utf-8')}")
