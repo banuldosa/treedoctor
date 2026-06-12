@@ -8,19 +8,26 @@ st.title("🌲 AI Tree Doctor (MVP)")
 st.markdown("### 📷 Take a photo or upload an image to diagnose tree diseases.")
 
 # 2. Streamlit Cloud Secrets로부터 API Key 로드
-GOOGLE_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+raw_api_key = st.secrets.get("GEMINI_API_KEY", "")
+
+# 🌟 [에러 해결의 핵심] 키 앞뒤에 숨어있는 눈에 안 보이는 공백, 줄바꿈(\n), 특수문자를 완전히 제거
+GOOGLE_API_KEY = raw_api_key.strip() if raw_api_key else ""
 
 if not GOOGLE_API_KEY:
     st.warning("👈 Please set GEMINI_API_KEY in Streamlit advanced settings.")
 else:
-    # 구글 GenAI 클라이언트 가동
-    client = genai.Client(api_key=GOOGLE_API_KEY)
-    
+    try:
+        # 공백이 싹 청소된 깨끗한 키로 구글 클라이언트 가동
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+    except Exception as e:
+        st.error(f"Initialization Error: {str(e)}")
+        client = None
+
     # 통합 이미지 업로더 가동
     uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
-    if uploaded_file is not None:
-        # 🌟 이미지를 PIL 객체로 로드 (화면 출력 및 API 전송용)
+    if uploaded_file is not None and client is not None:
+        # 이미지를 PIL 객체로 로드
         image = Image.open(uploaded_file)
         st.image(image, caption="Target Image", use_container_width=True)
         
@@ -37,8 +44,7 @@ else:
         )
         
         try:
-            # 🌟 [해결의 핵심] 복잡한 바이트 패킹을 생략하고, 
-            # 순수 PIL 이미지 객체(image)와 텍스트를 리스트로 직접 묶어 전송합니다.
+            # 순수 PIL 이미지 객체(image)와 텍스트를 리스트로 묶어 전송
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=[image, prompt_text]
