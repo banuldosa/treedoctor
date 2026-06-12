@@ -6,35 +6,46 @@ from PIL import Image
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.set_page_config(page_title="스마트 나무의사 - 현장 입력", layout="centered")
+st.title("🌲 스마트 나무의사 (3장 통합 분석)")
 
-st.title("🌲 스마트 나무의사 - 현장 입력")
+# 1. 3장 동시 사진 업로드
+st.markdown("### 1. 현장 사진 촬영 (전체/근접/병반 3장 필수)")
+uploaded_files = st.file_uploader("현장 사진 3장을 선택하세요.", type=["jpg", "png"], accept_multiple_files=True)
 
-# 1. 사진 촬영 및 AI 수종 동정
-st.markdown("### 1. 수목 피해 사진 등록 (필수)")
-uploaded_file = st.file_uploader("📸 현장 사진 촬영 / 파일 선택", type=["jpg", "png"])
+if uploaded_files:
+    if len(uploaded_files) > 3:
+        st.warning("⚠️ 3장까지만 분석 가능합니다. 사진을 다시 선택해주세요.")
+    else:
+        # 사진 미리보기
+        cols = st.columns(len(uploaded_files))
+        for i, file in enumerate(uploaded_files):
+            cols[i].image(file, use_container_width=True)
+        
+        if st.button("🚀 3장 통합 AI 분석 시작"):
+            with st.spinner("🔍 AI가 사진 3장을 종합 분석 중입니다..."):
+                # 3장의 이미지를 리스트로 생성
+                images = [Image.open(f) for f in uploaded_files]
+                
+                # 프롬프트: 3장의 맥락을 설명
+                prompt = (
+                    "이 3장의 사진은 동일한 나무의 현장 사진입니다. "
+                    "첫 번째는 수형, 두 번째는 잎/수피, 세 번째는 병반의 근접 샷입니다. "
+                    "이 데이터를 종합하여 정확한 수종과 질병명을 한국어로 답해줘. "
+                    "결과값만 '수종: OOO, 병명: OOO' 형식으로 출력해."
+                )
+                
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[*images, prompt]
+                )
+                
+                # 결과 저장 및 표시
+                st.session_state.ai_analysis = response.text
+                st.success(f"👉 AI 통합 분석 결과: {response.text}")
 
-# 초기값 설정
-detected_tree = "잣나무 (Pinus koraiensis)" # 기본값
-
-if uploaded_file:
-    img = Image.open(uploaded_file)
-    st.image(img, use_container_width=True)
-    
-    with st.spinner("🔍 AI가 사진을 정밀 분석 중입니다..."):
-        # Gemini Vision AI에게 수종 및 질병 분석 요청
-        prompt = "이 나무의 수종과 보이는 병징(질병명)을 한국어로 짧게 답해줘. 결과값만 '수종:OOO, 병명:OOO' 형식으로 줘."
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[img, prompt]
-        )
-        # AI 결과 파싱 (간단 예시)
-        st.success(f"👉 AI 분석 완료: {response.text}")
-        detected_tree = response.text.split("수종:")[1].split(",")[0].strip()
-
-# 2. AI 동정 결과 (자동 매핑)
+# 2. 동정 결과 자동 매핑 및 입력 폼 (이후 단계 동일)
 st.markdown("### 2. AI 수종 동정 결과")
-tree_list = [detected_tree, "잣나무", "소나무", "해송", "스트로브잣나무"]
-selected_tree = st.selectbox("🎯 AI가 동정한 결과 (*수정 가능)", tree_list, index=0)
+default_val = st.session_state.get('ai_analysis', "분석 전")
+st.selectbox("🎯 AI 분석 결과 (*수정 가능)", [default_val, "잣나무", "소나무"], index=0)
 
-# (이하 기존 GPS 및 소견 입력란은 동일하게 유지)
-# ...
+# (이후 위치/소견 입력 폼은 이전과 동일하게 유지)
