@@ -17,7 +17,7 @@ if uploaded_files and len(uploaded_files) == 3:
         with st.spinner("AI 분석 중..."):
             images = [Image.open(f) for f in uploaded_files]
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-2.0-flash',
                 contents=[*images, "수종과 병명을 '수종:OOO, 병명:OOO' 형식으로 답해줘."]
             )
             st.success(f"👉 AI 분석 완료: {response.text}")
