@@ -1,5 +1,6 @@
 import streamlit as st
 from google import genai
+from google.genai import types
 from PIL import Image
 import io
 
@@ -21,24 +22,23 @@ else:
     uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
-        # 이미지 열기 및 출력
+        # 이미지 열기 및 화면 출력
         image = Image.open(uploaded_file)
         st.image(image, caption="Target Image", use_container_width=True)
         
         st.warning("🔄 Analyzing... Please wait a moment.")
 
-        # 이미지 데이터를 구글 API 규격에 맞는 바이너리 패키지로 정밀 가공
+        # 🌟 Pydantic 검증 에러를 해결하기 위해 이미지를 바이너리 바이트로 변환
         img_byte_arr = io.BytesIO()
-        # 원본 포맷 유지 (없으면 JPEG로 기본 지정)
         img_format = image.format if image.format else "JPEG"
         image.save(img_byte_arr, format=img_format)
         img_bytes = img_byte_arr.getvalue()
 
-        # 인코딩 오류를 유발하는 객체 지향 방식을 버리고, 가장 안정적인 구조 체계로 이미지 포장
-        image_part = {
-            "mime_type": f"image/{img_format.lower()}",
-            "data": img_bytes
-        }
+        # 🌟 [해결의 핵심] google-genai 라이브러리가 요구하는 공식 Part 객체 규격으로 포장
+        image_part = types.Part.from_bytes(
+            data=img_bytes,
+            mime_type=f"image/{img_format.lower()}"
+        )
 
         # 구글 AI 스튜디오 서버 전달용 전문 진단 프롬프트
         prompt_text = (
@@ -51,7 +51,7 @@ else:
         )
         
         try:
-            # gemini-2.5-flash 모델에 이미지 바이너리 패키지와 텍스트 전송
+            # gemini-2.5-flash 모델에 공식 규격으로 포장된 데이터 송신
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=[image_part, prompt_text]
@@ -66,5 +66,5 @@ else:
                 st.error("No text response generated.")
             
         except Exception as e:
-            # 통신 에러 내용 상세 출력 (추후 디버깅 용도)
+            # 통신 에러 내용 상세 출력
             st.error(f"⚠️ Connection Error: {str(e)}")
