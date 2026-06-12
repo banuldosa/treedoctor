@@ -25,7 +25,7 @@ else:
     client = genai.Client(api_key=GOOGLE_API_KEY)
     
     # 스마트폰 전용 카메라 입력창
-    uploaded_file = st.camera_input("📷 스마트폰 카메라로 나무 촬영하기")
+    uploaded_file = st.file_uploader("📷 아픈 나무 사진 촬영 또는 선택하기", type=["jpg", "jpeg", "png"])uploaded_file = st.file_uploader("📷 아픈 나무 사진 촬영 또는 선택하기", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
         from PIL import Image
