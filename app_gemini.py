@@ -1,6 +1,6 @@
 import streamlit as st
-import io
 from google import genai
+from google.genai import types  # 명시적 타입 호출 추가
 from PIL import Image
 from streamlit_geolocation import streamlit_geolocation
 
@@ -18,16 +18,14 @@ if uploaded_files and len(uploaded_files) == 3:
     if st.button("🚀 AI 분석 시작"):
         with st.spinner("AI가 사진 3장을 종합 분석 중입니다..."):
             try:
-                # 이미지를 바이트 데이터로 변환하여 리스트 생성
+                # API가 요구하는 types.Part 객체 리스트 생성
                 contents = []
                 for f in uploaded_files:
                     img = Image.open(f)
-                    # PIL 이미지를 바이트 배열로 변환 (API가 가장 선호하는 방식)
-                    img_byte_arr = io.BytesIO()
-                    img.save(img_byte_arr, format=img.format if img.format else 'JPEG')
-                    contents.append(img_byte_arr.getvalue())
+                    # PIL 이미지를 Part 객체로 변환하여 추가
+                    contents.append(types.Part.from_pil_image(img))
                 
-                # 마지막에 프롬프트 추가
+                # 텍스트 프롬프트도 Part 객체로 추가
                 contents.append("이 3장의 사진을 종합하여 수종과 병명을 '수종:OOO, 병명:OOO' 형식으로 답해줘.")
                 
                 # 모델 호출
@@ -41,5 +39,4 @@ if uploaded_files and len(uploaded_files) == 3:
             except Exception as e:
                 st.error(f"분석 중 오류 발생: {str(e)}")
 
-st.markdown("---")
-# ... (이하 GPS, 소견 입력 및 발행 버튼은 동일)
+# ... (이하 GPS 및 소견 입력은 이전과 동일하게 유지)
