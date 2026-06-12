@@ -2,6 +2,7 @@ import streamlit as st
 import io
 import re
 import time
+import requests
 from google import genai
 from google.genai import types
 from PIL import Image
@@ -73,7 +74,6 @@ if st.button("🚀 전문가 정밀 진단 시작"):
     else:
         st.warning("사진을 하나 이상 업로드해주세요.")
 
-# 결과 출력 및 수정 UI
 if st.session_state.ai_result:
     with st.expander("🔍 전문 진단 보고서", expanded=True):
         st.write(st.session_state.ai_result)
@@ -85,38 +85,44 @@ if st.session_state.ai_result:
     if st.button("🔄 수정된 정보로 보고서 재생성"):
         st.session_state.detected_species = st.session_state.s_fix
         st.session_state.detected_disease = st.session_state.d_fix
-        
         with st.spinner("전문가 의견을 재작성 중입니다..."):
             try:
                 models = list(client.models.list())
                 model_name = next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
-                re_prompt = f"""
-                당신은 국가공인 나무의사입니다. 
-                수종이 '{st.session_state.detected_species}'이고 병명이 '{st.session_state.detected_disease}'로 확인되었습니다.
-                이 정보를 바탕으로 다시 진단 보고서를 작성해주세요.
-                수종: {st.session_state.detected_species}
-                병명: {st.session_state.detected_disease}
-                피해도: [상/중/하]
-                전문가 소견: [종합적인 처방 의견 및 관리 방안]
-                """
+                re_prompt = f"수종: {st.session_state.detected_species}\n병명: {st.session_state.detected_disease}\n이 정보를 바탕으로 전문가 진단 보고서를 다시 작성해주세요."
                 response = client.models.generate_content(model=model_name, contents=re_prompt)
                 st.session_state.ai_result = response.text
                 st.rerun()
             except Exception as e:
                 st.error(f"보고서 재생성 실패: {e}")
 
-# 3. [섹션 2] GPS 위치 수집
+# 3. [섹션 2] 조사 위치 (GPS 및 네이버 주소 변환)
 st.markdown("---")
 st.markdown("### 2. 조사 위치 (GPS)")
 col_a, col_b = st.columns([3, 1])
 with col_a:
     addr_input = st.text_input("현장 주소", value=st.session_state.addr_data)
 with col_b:
-    if st.button("📍 GPS 가져오기"):
+    if st.button("📍 주소 자동입력"):
         loc = streamlit_geolocation()
-        if loc and isinstance(loc, dict) and loc.get('latitude'):
-            st.session_state.addr_data = f"위도:{loc['latitude']:.4f}, 경도:{loc['longitude']:.4f}"
-            st.rerun()
+        if loc and loc.get('latitude'):
+            lat, lon = loc['latitude'], loc['longitude']
+            url = f"https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc?coords={lon},{lat}&output=json"
+            headers = {
+                "X-NCP-APIGW-API-KEY-ID": st.secrets["NAVER_CLIENT_ID"],
+                "X-NCP-APIGW-API-KEY": st.secrets["NAVER_CLIENT_SECRET"]
+            }
+            try:
+                res = requests.get(url, headers=headers).json()
+                if res['status']['code'] == 0 and res['results']:
+                    area = res['results'][0]['region']
+                    addr = f"{area['area1']['name']} {area['area2']['name']} {area['area3']['name']} {area['area4']['name']}".strip()
+                    st.session_state.addr_data = addr
+                    st.rerun()
+                else:
+                    st.warning("주소 정보를 찾을 수 없습니다.")
+            except Exception as e:
+                st.error(f"주소 변환 실패: {e}")
 
 # 4. [섹션 3] 전문가 소견
 st.markdown("---")
