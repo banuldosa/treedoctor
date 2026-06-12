@@ -26,56 +26,53 @@ if 'detected_disease' not in st.session_state: st.session_state.detected_disease
 if 'addr_data' not in st.session_state: st.session_state.addr_data = ""
 if 'uploaded_images' not in st.session_state: st.session_state.uploaded_images = []
 
+# 모델명 조회 공통 함수
+def get_model_name():
+    models = list(client.models.list())
+    return next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
+
 # 2. [섹션 1] 사진 촬영 및 전문가 AI 동정
 st.markdown("### 1. 현장 사진 촬영 및 AI 정밀 동정")
 uploaded_files = st.file_uploader("현장 상황이 담긴 모든 사진을 업로드하세요.", type=["jpg", "png"], accept_multiple_files=True)
 
 if st.button("🚀 전문가 정밀 진단 시작"):
     if uploaded_files:
-        st.session_state.uploaded_images = uploaded_files # 사진 저장
+        st.session_state.uploaded_images = uploaded_files
         with st.spinner(f"총 {len(uploaded_files)}장의 사진을 분석 중입니다..."):
-            for attempt in range(3):
-                try:
-                    models = list(client.models.list())
-                    model_name = next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
-                    
-                    parts = []
-                    for f in uploaded_files:
-                        img = Image.open(f).convert("RGB")
-                        img.thumbnail((1024, 1024))
-                        img_byte_arr = io.BytesIO()
-                        img.save(img_byte_arr, format='JPEG', quality=85)
-                        parts.append(types.Part.from_bytes(data=img_byte_arr.getvalue(), mime_type='image/jpeg'))
-                    
-                    prompt = "당신은 국가공인 나무의사입니다. 사진을 보고 진단하세요. 형식: 수종: [국명(학명)]\n병명: [병해충명/장애명]\n피해도: [상/중/하]\n전문가 소견: [해설 및 처방]"
-                    parts.append(types.Part.from_text(text=prompt))
-                    
-                    response = client.models.generate_content(model=model_name, contents=parts)
-                    st.session_state.ai_result = response.text
-                    
-                    s_match = re.search(r"수종:\s*\[(.*?)\]", response.text)
-                    d_match = re.search(r"병명:\s*\[(.*?)\]", response.text)
-                    if s_match: st.session_state.detected_species = s_match.group(1)
-                    if d_match: st.session_state.detected_disease = d_match.group(1)
-                    
-                    st.rerun()
-                    break 
-                except Exception as e:
-                    if attempt < 2: time.sleep(2); continue
-                    st.error(f"진단 실패: {e}")
-                    break
+            try:
+                model_name = get_model_name()
+                parts = []
+                for f in uploaded_files:
+                    img = Image.open(f).convert("RGB")
+                    img.thumbnail((1024, 1024))
+                    img_byte_arr = io.BytesIO()
+                    img.save(img_byte_arr, format='JPEG', quality=85)
+                    parts.append(types.Part.from_bytes(data=img_byte_arr.getvalue(), mime_type='image/jpeg'))
+                
+                prompt = "당신은 국가공인 나무의사입니다. 사진을 보고 진단하세요. 형식: 수종: [국명(학명)]\n병명: [병해충명/장애명]\n피해도: [상/중/하]\n전문가 소견: [해설 및 처방]"
+                parts.append(types.Part.from_text(text=prompt))
+                
+                response = client.models.generate_content(model=model_name, contents=parts)
+                st.session_state.ai_result = response.text
+                
+                s_match = re.search(r"수종:\s*\[(.*?)\]", response.text)
+                d_match = re.search(r"병명:\s*\[(.*?)\]", response.text)
+                if s_match: st.session_state.detected_species = s_match.group(1)
+                if d_match: st.session_state.detected_disease = d_match.group(1)
+                
+                st.rerun()
+            except Exception as e:
+                st.error(f"진단 실패: {e}")
     else:
         st.warning("사진을 하나 이상 업로드해주세요.")
 
 if st.session_state.ai_result:
     with st.expander("🔍 전문 진단 보고서", expanded=True):
-        # 사진 출력 로직 추가
         if st.session_state.uploaded_images:
             st.markdown("#### 📸 현장 관찰 사진")
             cols = st.columns(min(len(st.session_state.uploaded_images), 3))
             for i, img_file in enumerate(st.session_state.uploaded_images):
                 cols[i % 3].image(img_file, use_container_width=True)
-        
         st.markdown("---")
         st.write(st.session_state.ai_result)
     
@@ -87,12 +84,16 @@ if st.session_state.ai_result:
         st.session_state.detected_species = st.session_state.s_fix
         st.session_state.detected_disease = st.session_state.d_fix
         with st.spinner("전문가 의견을 재작성 중입니다..."):
-            re_prompt = f"수종: {st.session_state.detected_species}\n병명: {st.session_state.detected_disease}\n이 정보를 바탕으로 전문가 진단 보고서를 다시 작성해주세요."
-            response = client.models.generate_content(model=model_name, contents=re_prompt)
-            st.session_state.ai_result = response.text
-            st.rerun()
+            try:
+                model_name = get_model_name()
+                re_prompt = f"수종: {st.session_state.detected_species}\n병명: {st.session_state.detected_disease}\n이 정보를 바탕으로 전문가 진단 보고서를 다시 작성해주세요."
+                response = client.models.generate_content(model=model_name, contents=re_prompt)
+                st.session_state.ai_result = response.text
+                st.rerun()
+            except Exception as e:
+                st.error(f"보고서 재생성 실패: {e}")
 
-# 3. [섹션 2] 조사 위치 (GPS 및 네이버 주소 변환)
+# 3. [섹션 2] 조사 위치
 st.markdown("---")
 st.markdown("### 2. 조사 위치 (GPS)")
 col_a, col_b = st.columns([3, 1])
