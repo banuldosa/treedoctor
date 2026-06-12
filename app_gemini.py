@@ -43,7 +43,7 @@ else:
             
             # 🌟 [모델 변경] 기존 'gemini-2.5-flash'에서 고성능 추론 모델인 'gemini-2.5-pro'로 교체했습니다.
             response = client.models.generate_content(
-                model='gemini-2.5-pro',
+                model='gemini-2.5-flash',
                 contents=[image, prompt_text]
             )
             
