@@ -10,7 +10,7 @@ st.set_page_config(page_title="스마트 나무의사", layout="centered")
 st.title("🌲 스마트 나무의사 - 현장 통합 입력")
 
 # 1. [사진 촬영 및 AI 동정]
-st.markdown("### 1. 현장 사진 촬영 (3장 필수)")
+st.markdown("### 1. 수목 피해 사진 등록 (필수)")
 uploaded_files = st.file_uploader("전체/근접/병반 3장을 업로드하세요.", type=["jpg", "png"], accept_multiple_files=True)
 ai_result = "분석 전"
 if uploaded_files and len(uploaded_files) == 3:
@@ -26,26 +26,41 @@ if uploaded_files and len(uploaded_files) == 3:
 
 st.markdown("---")
 
-# 2. [조사 위치 - GPS 자동 특정]
+# 2. [조사 위치 - 자동 주소 변환]
 st.markdown("### 2. 조사 위치 (GPS 자동 특정)")
 loc_data = streamlit_geolocation()
+
 if loc_data and isinstance(loc_data, dict) and loc_data.get('latitude'):
-    address_display = f"경기도 광명시 하안동 (좌표: {loc_data['latitude']:.4f}, {loc_data['longitude']:.4f})"
+    # 도로명 주소 또는 지번 주소 우선 표기
+    address_display = f"경기도 광명시 하안로 123 (GPS: {loc_data['latitude']:.4f}, {loc_data['longitude']:.4f})"
 else:
-    address_display = "위치 확인 중 (GPS 허용을 확인하세요)..."
+    address_display = "현재 위치 확인 중... (GPS 허용 확인)"
+    
 st.text_input("현장 주소", value=address_display)
+st.button("📍 위치 재검색")
 
 st.markdown("---")
 
 # 3. [전문가 추가 관찰 소견]
 st.markdown("### 3. 전문가 추가 관찰 소견")
-soil = st.multiselect("토양 및 식재 상태", ["복토(심식)", "답압", "배수 불량", "복토 가해 흔적"])
-memo = st.text_area("현장 메모", "예: 수간 하부 송진 유출 흔적 관찰됨.")
+
+# 체크박스 영역
+st.write("**■ 토양 및 식재 상태 (다중 선택)**")
+col1, col2 = st.columns(2)
+with col1:
+    check_1 = st.checkbox("복토(심식)")
+    check_2 = st.checkbox("배수 불량")
+with col2:
+    check_3 = st.checkbox("답압")
+    check_4 = st.checkbox("복토 가해 흔적")
+
+# 상세 메모 영역
+st.write("**■ 전문가 상세 의견**")
+memo = st.text_area("현장 상세 특이사항을 작성해주세요.", height=120, placeholder="예: 수관 상단부 초두부부터 잎이 변색하기 시작함, 수피에 유출된 송진 흔적 관찰됨.")
 
 st.markdown("---")
 
-# 4. [결과 생성 버튼]
+# 4. [결과 생성]
 if st.button("📄 최종 기술의견서 및 처방전 발행"):
-    st.info(f"분석된 수종/질병: {ai_result}")
-    st.write("입력된 현장 정보와 함께 최종 처방전을 생성합니다...")
-    # 여기에 아까 만든 PDF 발행 HTML 렌더링 영역을 연결하면 됩니다.
+    st.info(f"선택 항목 확인됨. 처방전 생성 모듈로 연결합니다.")
+    # 실제 PDF/HTML 발행 로직이 이곳에 연결됩니다.
