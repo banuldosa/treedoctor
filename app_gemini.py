@@ -2,7 +2,7 @@ import streamlit as st
 from google import genai
 from PIL import Image
 
-# 1. UI 설정 (인코딩 충돌을 방지하기 위해 심플한 텍스트와 이모지로 구성)
+# 1. UI 및 레이아웃 단순화 (인코딩 버그 원천 차단)
 st.set_page_config(page_title="Gemini AI Tree Doctor", page_icon="🌲")
 st.title("🌲 AI Tree Doctor (MVP)")
 st.markdown("### 📷 Take a photo or upload an image to diagnose tree diseases.")
@@ -23,28 +23,29 @@ else:
         
         st.warning("🔄 Analyzing... Please wait a moment.")
 
-        # 🌟 [입력 위치] 여기에 정교한 영문 지시문(Prompt)이 들어갑니다.
-        # AI에게 한국산림청 및 수목보호학적 기준을 따르되, 답변은 한국어로 하도록 강제하는 설정입니다.
-        # AI에게 첫 문장을 "AI 나무의사입니다."로 시작하도록 강제하는 정교한 영문 프롬프트
-        # AI에게 첫 문장을 "AI 나무의사"로 시작하도록 강제하는 정교한 영문 프롬프트
+        # 🌟 [초핵심] 무료이면서도 정확도를 극대화하기 위한 수목보호학 가이드라인 주입
         prompt_text = (
             "You are a strict and highly accurate Tree Doctor AI certified by the Korea Forest Service. "
             "Analyze the provided high-resolution image of the tree disease or pest very carefully. "
-            "Look for microscopic signs such as mycelium, spores, lesions, frass, or specific discoloration pattern. "
-            "CRITICAL: You must write the entire response in Korean. "
-            "CRITICAL: You MUST start your very first sentence exactly as: '안녕하십니까, AI 나무의사입니다. 제공해주신 소나무 질병 이미지와 세부 확대 이미지를 정밀하게 분석한 결과, 다음과 같이 진단하고 방제 계획을 수립합니다.'\n\n"
+            "Think step-by-step like a human expert taking the Tree Doctor practical exam. "
+            "Examine microscopic structures: color/shape of fruiting bodies, fungal mycelium, rust spores, or insect frass.\n\n"
+            
+            "CRITICAL ORDER 1: You must write the entire response in Korean.\n"
+            "CRITICAL ORDER 2: You MUST start your very first sentence exactly as:\n"
+            "'안녕하십니까, AI 나무의사입니다. 제공해주신 소나무 질병 이미지와 세부 확대 이미지를 정밀하게 분석한 결과, 다음과 같이 진단하고 방제 계획을 수립합니다.'\n\n"
+            
             "Format the rest of the output strictly in Markdown with the following 4 sections:\n\n"
-            "1. [정확한 진단명]: Provide the exact common Korean name and scientific name of the disease/pest.\n"
-            "2. [수목보호학적 진단 근거]: Explain why you diagnosed this based on the visual symptoms (e.g., color of spores, shape of canker) in the photo.\n"
-            "3. [산림청 기준 방제법]: Suggest exact chemical treatments (pesticide names approved in Korea) and cultural/mechanical control methods.\n"
-            "4. [수목 관리 주의사항]: Note precautions regarding pesticide resistance, timing of application, and environment factors."
+            "1. [정확한 진단명]: Provide the exact common Korean name and scientific name of the disease/pest. (e.g., 소나무 혹병 Cronartium flaccidum)\n"
+            "2. [수목보호학적 진단 근거]: Detail the specific visual symptoms and signs shown in the photo supporting your diagnosis.\n"
+            "3. [산림청 기준 방제법]: Suggest exact approved chemical pesticide names in Korea and mechanical/cultural control methods.\n"
+            "4. [수목 관리 주의사항]: Precautions for chemical toxicity, environment factors, and preventing recurrence."
         )
         
         try:
             # 안전하게 세탁된 API Key로 클라이언트 생성
             client = genai.Client(api_key=GOOGLE_API_KEY)
             
-            # 🌟 [모델 변경] 기존 'gemini-2.5-flash'에서 고성능 추론 모델인 'gemini-2.5-pro'로 교체했습니다.
+            # 🌟 [해결책] 무료 제한이 거의 없고 서버가 상시 대기 중인 'gemini-2.5-flash'로 롤백하여 에러를 원천 차단합니다.
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=[image, prompt_text]
@@ -58,7 +59,4 @@ else:
                 st.error("No text response generated.")
             
         except Exception as e:
-            error_msg = str(e)
-            st.error(f"⚠️ Connection Error: {error_msg}")
-            if "ascii" in error_msg.lower():
-                st.info("💡 Tip: 구글 AI 스튜디오에서 API 키를 새로 발급받아 Secrets에 다시 붙여넣어 보세요.")
+            st.error(f"⚠️ Connection Error: {str(e)}")
