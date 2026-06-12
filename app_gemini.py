@@ -25,12 +25,14 @@ else:
 
         # 🌟 [입력 위치] 여기에 정교한 영문 지시문(Prompt)이 들어갑니다.
         # AI에게 한국산림청 및 수목보호학적 기준을 따르되, 답변은 한국어로 하도록 강제하는 설정입니다.
+        # AI에게 첫 문장을 "AI 나무의사입니다."로 시작하도록 강제하는 정교한 영문 프롬프트
         prompt_text = (
-            "You are a strict and highly accurate Tree Doctor certified by the Korea Forest Service. "
+            "You are a strict and highly accurate Tree Doctor AI certified by the Korea Forest Service. "
             "Analyze the provided high-resolution image of the tree disease or pest very carefully. "
             "Look for microscopic signs such as mycelium, spores, lesions, frass, or specific discoloration pattern. "
             "CRITICAL: You must write the entire response in Korean. "
-            "Format the output strictly in Markdown with the following 4 sections:\n\n"
+            "CRITICAL: You MUST start your very first sentence exactly as: '안녕하십니까. AI 나무의사입니다. 제공해주신 고해상도 이미지를 면밀히 분석한 결과, 다음과 같이 진단 및 방제법을 제시합니다.'\n\n"
+            "Format the rest of the output strictly in Markdown with the following 4 sections:\n\n"
             "1. [정확한 진단명]: Provide the exact common Korean name and scientific name of the disease/pest.\n"
             "2. [수목보호학적 진단 근거]: Explain why you diagnosed this based on the visual symptoms (e.g., color of spores, shape of canker) in the photo.\n"
             "3. [산림청 기준 방제법]: Suggest exact chemical treatments (pesticide names approved in Korea) and cultural/mechanical control methods.\n"
