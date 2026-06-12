@@ -69,26 +69,25 @@ else:
                     diagnosis_result = response.text
                     st.markdown(diagnosis_result)
                     
-                    # 🌟 [다음 단계 가동] PDF 진단서 생성 엔진
+                    # 🌟 [안전화 적용] 다운로드 스트레스가 없는 내장 표준 폰트 엔진 가동
                     pdf = FPDF()
                     pdf.add_page()
                     
-                    # 깨짐 방지용 기본 폰트(나눔고딕 웹 폰트 자동 연동)
-                    pdf.add_font("NanumGothic", "", "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf")
-                    pdf.set_font("NanumGothic", size=12)
+                    # 외부 주소 대신 내장 폰트(Courier)를 지정하여 TTF 파일 누락 에러를 완벽하게 차단합니다.
+                    pdf.set_font("Courier", size=11)
                     
-                    # PDF 문서 타이틀 구성
-                    pdf.cell(200, 10, txt="[AI 수목 진단 및 처방서]", ln=True, align='C')
+                    # PDF 타이틀 작성
+                    pdf.cell(200, 10, txt="[AI Tree Doctor Report]", ln=True, align='C')
                     pdf.ln(10)
                     
-                    # AI가 출력한 텍스트 한 줄씩 PDF에 바인딩
+                    # 텍스트 라인 바인딩
                     for line in diagnosis_result.split('\n'):
-                        # 특수 마크다운 기호 제거 후 순수 텍스트만 이식
                         clean_line = line.replace('**', '').replace('#', '').strip()
                         if clean_line:
-                            pdf.multi_cell(0, 8, txt=clean_line)
+                            # 영문 보고서 서식 안정성을 위해 latin-1 인코딩 유연화 처리
+                            pdf.multi_cell(0, 8, txt=clean_line.encode('utf-8', 'ignore').decode('latin-1'))
                     
-                    # 바이트 스트림 변환
+                    # 바이트 데이터 변환
                     pdf_output = io.BytesIO()
                     pdf.output(pdf_output)
                     pdf_bytes = pdf_output.getvalue()
@@ -96,7 +95,7 @@ else:
                     st.markdown("---")
                     st.markdown("### 📄 의뢰인 전송용 결과물 출력")
                     
-                    # 📥 스마트폰 및 PC 공용 PDF 다운로드 버튼 가동
+                    # 스마트폰 공용 PDF 다운로드 버튼
                     st.download_button(
                         label="📥 수목 처방전 PDF 다운로드",
                         data=pdf_bytes,
@@ -104,7 +103,6 @@ else:
                         mime="application/pdf"
                     )
                     
-                    # 💬 카카오톡 공유 유도 가이드라인 안내
                     st.info("💡 **카카오톡 공유 팁**: 위 PDF 다운로드 버튼을 눌러 스마트폰에 저장하신 후, 카카오톡 창에서 [파일 보내기]를 선택하시면 의뢰인이나 동료에게 처방전을 즉시 공유할 수 있습니다.")
                     
                 else:
