@@ -1,6 +1,5 @@
 import streamlit as st
 import io
-import re  # [추가] 텍스트 파싱을 위한 정규표현식 라이브러리
 from google import genai
 from google.genai import types
 from PIL import Image
@@ -10,80 +9,74 @@ from streamlit_geolocation import streamlit_geolocation
 st.set_page_config(page_title="스마트 나무의사", layout="centered")
 st.title("🌲 스마트 나무의사 - 현장 통합 시스템")
 
-# API 클라이언트 초기화
-try:
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-except Exception as e:
-    st.error("API 키를 확인하세요.")
-    st.stop()
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# 세션 데이터 초기화 (자동완성을 위해 변수 분리)
-if 'ai_result' not in st.session_state: st.session_state.ai_result = ""
-if 'detected_species' not in st.session_state: st.session_state.detected_species = "분석 전"
-if 'detected_disease' not in st.session_state: st.session_state.detected_disease = "분석 전"
-if 'addr_data' not in st.session_state: st.session_state.addr_data = ""
+# 2. [단계 1] 현장 사진 촬영 및 AI 자동 수종 동정
+st.markdown("### 1. 현장 사진 촬영 및 업로드")
+uploaded_files = st.file_uploader("현장 사진 3장을 업로드하세요.", type=["jpg", "png"], accept_multiple_files=True)
 
-# 2. [섹션 1] 사진 촬영 및 전문가 AI 동정
-st.markdown("### 1. 현장 사진 촬영 및 AI 정밀 동정")
-uploaded_files = st.file_uploader("전체/근접/병반 3장을 업로드하세요.", type=["jpg", "png"], accept_multiple_files=True)
+col_a, col_b = st.columns([3, 1])
+with col_a:
+    ai_result_input = st.text_input("AI 동정 결과", value=st.session_state.get('ai_result', ""))
+with col_b:
+    st.write("###")
+    if st.button("🚀 AI 분석 시작", use_container_width=True):
+        if uploaded_files and len(uploaded_files) == 3:
+            with st.spinner("이미지 분석 중..."):
+                try:
+                    # [핵심 수정] 서버에서 지원하는 모델 목록을 직접 확인하여 404 방지
+                    available_models = [m.name for m in client.models.list()]
+                    # 목록에서 1.5-flash 계열이 있으면 사용하고, 없으면 목록의 첫 번째 모델 사용
+                    model_to_use = next((m for m in available_models if 'gemini-1.5-flash' in m), available_models[0])
+                    
+                    parts = []
+                    for f in uploaded_files:
+                        img = Image.open(f)
+                        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+                        img.thumbnail((512, 512))
+                        img_byte_arr = io.BytesIO()
+                        img.save(img_byte_arr, format='JPEG')
+                        parts.append(types.Part.from_bytes(data=img_byte_arr.getvalue(), mime_type='image/jpeg'))
+                    
+                    parts.append(types.Part.from_text(text="수종과 병명을 '수종:OOO, 병명:OOO' 형식으로 답해줘."))
+                    
+                    # [핵심 수정] 확인된 모델 이름으로 호출
+                    response = client.models.generate_content(
+                        model=model_to_use, 
+                        contents=types.Content(role="user", parts=parts)
+                    )
+                    st.session_state.ai_result = response.text
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"분석 오류: {e}")
+                    st.write("현재 사용 가능한 모델 목록:", [m for m in available_models])
+        else:
+            st.warning("사진 3장을 업로드해주세요.")
 
-if st.button("🚀 AI 전문가 정밀 분석 시작"):
-    if uploaded_files and len(uploaded_files) >= 1:
-        with st.spinner("전문가 AI가 진단 중입니다..."):
-            try:
-                models = list(client.models.list())
-                model_name = next((m.name for m in models if 'gemini-1.5-flash' in m.name), models[0].name)
-                
-                parts = []
-                for f in uploaded_files:
-                    img = Image.open(f).convert("RGB")
-                    img_byte_arr = io.BytesIO()
-                    img.save(img_byte_arr, format='JPEG')
-                    parts.append(types.Part.from_bytes(data=img_byte_arr.getvalue(), mime_type='image/jpeg'))
-                
-                # [수정] 파싱을 쉽게 하기 위해 결과 형식을 명확히 요청
-                prompt = "당신은 숙련된 나무의사입니다. 사진을 보고 다음 형식으로만 답해줘.\n수종: [수종명(학명)]\n병명: [병명/해충명]\n피해도: [상/중/하]"
-                parts.append(types.Part.from_text(text=prompt))
-                
-                response = client.models.generate_content(model=model_name, contents=parts)
-                st.session_state.ai_result = response.text
-                
-                # [추가] 결과 자동 파싱 로직
-                species_match = re.search(r"수종:\s*\[(.*?)\]", response.text)
-                disease_match = re.search(r"병명:\s*\[(.*?)\]", response.text)
-                
-                if species_match: st.session_state.detected_species = species_match.group(1)
-                if disease_match: st.session_state.detected_disease = disease_match.group(1)
-                
-                st.rerun()
-            except Exception as e:
-                st.error(f"분석 실패: {e}")
-    else:
-        st.warning("사진을 먼저 업로드해주세요.")
+st.selectbox("💡 오동정 시 수종 직접 선택", ["선택하세요", "잣나무", "소나무", "느티나무", "기타"])
 
-if st.session_state.ai_result:
-    st.info(f"AI 원본 진단 결과:\n{st.session_state.ai_result}")
-    col1, col2 = st.columns(2)
-    # [수정] value에 session_state에 저장된 자동완성 값을 할당
-    with col1: st.text_input("수종 확정", value=st.session_state.detected_species)
-    with col2: st.text_input("병명/해충명 확정", value=st.session_state.detected_disease)
-
-# 3. [섹션 2] GPS 위치 수집 (기존 유지)
+# 3. [단계 2] GPS 기반 위치 자동 특정
 st.markdown("---")
 st.markdown("### 2. 조사 위치 (GPS)")
-col1, col2 = st.columns([3, 1])
-with col1:
-    addr_input = st.text_input("현장 주소", value=st.session_state.addr_data)
-with col2:
-    if st.button("📍 GPS 가져오기"):
-        loc = streamlit_geolocation()
-        if loc and isinstance(loc, dict) and loc.get('latitude'):
-            st.session_state.addr_data = f"위도:{loc['latitude']:.4f}, 경도:{loc['longitude']:.4f}"
-            st.rerun()
-        else:
-            st.warning("위치 권한을 확인하세요.")
+loc_data = streamlit_geolocation()
+lat = loc_data.get('latitude') if isinstance(loc_data, dict) else None
+addr = f"위도:{lat:.4f}, 경도:{loc_data.get('longitude'):.4f}" if lat else "위치 확인 중..."
+st.text_input("현장 주소", value=addr)
 
-# 4. [섹션 3] 전문가 소견 (기존 유지)
+# 4. [단계 3] 전문가 관찰 소견
 st.markdown("---")
 st.markdown("### 3. 전문가 관찰 소견")
-# ... (생략: 기존 코드와 동일하게 유지)
+c1, c2 = st.columns(2)
+with c1:
+    s1 = st.checkbox("복토(심식)")
+    s2 = st.checkbox("답압")
+    s3 = st.checkbox("배수 불량")
+with c2:
+    s4 = st.checkbox("복토 가해 흔적")
+    s5 = st.checkbox("주변 공사")
+    s6 = st.checkbox("동시 발병")
+
+st.text_area("전문가 종합 메모", height=100)
+
+if st.button("📄 최종 기술의견서 및 처방전 발행", type="primary", use_container_width=True):
+    st.success("데이터 취합 완료!")
