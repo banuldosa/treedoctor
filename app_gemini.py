@@ -3,7 +3,7 @@ from google import genai
 from PIL import Image
 from streamlit_cropper import st_cropper
 
-# 1. UI 및 레이아웃 설정
+# 1. UI 및 웹앱 레이아웃 설정
 st.set_page_config(page_title="Gemini AI Tree Doctor", page_icon="🌲")
 st.title("🌲 AI Tree Doctor (MVP)")
 st.markdown("### 📷 Upload a photo and crop the infected area for precise diagnosis.")
@@ -19,11 +19,13 @@ else:
     uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
+        # 원본 이미지 로드
         img = Image.open(uploaded_file)
         
         st.markdown("#### ✂️ 사각형 조절 상자로 미세 병징 부위를 지정해 주세요:")
         
-        # 🌟 [트래픽 방어 핵심] realtime_update를 False로 바꾸어 상자를 움직일 때 횟수가 낭비되는 것을 원천 차단합니다.
+        # 🌟 [트래픽 완벽 방어] realtime_update=False 설정을 통해 
+        # 사용자가 상자를 드래그하는 동안 불필요한 새로고침이나 트래픽이 생기는 것을 원천 차단합니다.
         cropped_img = st_cropper(
             img, 
             realtime_update=False, 
@@ -31,12 +33,13 @@ else:
             aspect_ratio=None
         )
         
-        st.markdown("ℹ️ *상자 크기를 조절한 후, 아래 진단 시작 버튼을 누르면 자른 이미지가 확정되어 분석됩니다.*")
+        st.markdown("ℹ️ *상자 영역을 지정한 후, 아래 버튼을 누르면 해당 확대 이미지로 진단이 시작됩니다.*")
         
-        # 사용자가 최종 버튼을 누를 때만 딱 1회 구글 서버와 통신합니다.
+        # 🌟 최종 버튼을 누르는 순간에만 구글 서버로 요청이 날아갑니다 (하루 20회 제한 방어)
         if st.button("🚀 선택 구간으로 진단 시작", type="primary"):
             st.warning("🔄 Analyzing... Please wait a moment.")
 
+            # 첫 문장 고정 및 수목보호학적 진단을 유도하는 정교한 프롬프트
             prompt_text = (
                 "You are a strict and highly accurate Tree Doctor AI certified by the Korea Forest Service. "
                 "Analyze the provided close-up/cropped image of the tree disease or pest very carefully. "
@@ -55,8 +58,10 @@ else:
             )
             
             try:
+                # 안전한 키로 구글 GenAI 클라이언트 오픈
                 client = genai.Client(api_key=GOOGLE_API_KEY)
                 
+                # 사용자가 최종 지정한 크롭 이미지만 깔끔하게 송신
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=[cropped_img, prompt_text]
