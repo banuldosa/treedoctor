@@ -89,20 +89,3 @@ if st.session_state.ai_result:
         st.session_state.detected_species = st.session_state.s_fix
         st.session_state.detected_disease = st.session_state.d_fix
         st.rerun()
-
-# 3. [섹션 2] 조사 위치 (GPS)
-st.markdown("---")
-st.markdown("### 2. 조사 위치 (GPS)")
-if st.button("📍 주소 자동입력"):
-    loc = streamlit_geolocation()
-    if loc and loc.get('latitude'):
-        st.session_state.addr_data = f"위도:{loc['latitude']:.4f}, 경도:{loc['longitude']:.4f}"
-        st.rerun()
-st.text_input("현장 주소", value=st.session_state.addr_data)
-
-# 4. [섹션 3] 최종 발행
-st.markdown("---")
-st.markdown("### 3. 전문가 관찰 소견")
-st.text_area("전문가 종합 메모", height=100)
-if st.button("📄 최종 기술의견서 발행", type="primary", use_container_width=True):
-    st.success("데이터 취합 완료! PDF 생성 모듈 연동 준비 완료.")
